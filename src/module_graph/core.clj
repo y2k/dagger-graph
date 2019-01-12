@@ -1,5 +1,17 @@
 (ns module-graph.core)
 
+(def scope-files
+  (->> (java.io.File. path-to-proj)
+       (file-seq)
+       (filter #(re-matches #".+\.(kt|java)" (.getName %)))
+       (remove #(re-matches #".+(Di|Component|Module).(kt|java)" (.getName %)))
+       (mapv #(let [content (slurp %)
+                    scope (second (re-find #"@(\w+Scope)" content))]
+                {:scope scope
+                 :filename (second (re-find #"(.+)\.[ktjava]+" (.getName %)))}))
+       (filter #(:scope %))
+       (vec)))
+
 (defn format-to-string [root-name modules]
   (defn get-children-modules [name all-modules]
     (->> all-modules
@@ -8,10 +20,12 @@
          (:children-names)))
 
   (defn rec-format-to-string [module-name prefix a b]
-    (str prefix a module-name "\n"
+    (str prefix a module-name
+         " (" (clojure.string/join ", " (mapv #(:filename %) (filter #(= module-name (:scope %)) scope-files))) ")"
+         "\n"
          (let [children (get-children-modules module-name modules)]
            (->> children
-                (map-indexed #(addToStringBuilder
+                (map-indexed #(rec-format-to-string
                                %2
                                (str prefix b)
                                (if (< (+ % 1) (count children)) "|-- " "\\-- ")
