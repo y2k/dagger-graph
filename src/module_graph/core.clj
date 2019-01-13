@@ -1,18 +1,7 @@
-(ns module-graph.core)
+(ns module-graph.core
+  (:gen-class))
 
-(def scope-files
-  (->> (java.io.File. path-to-proj)
-       (file-seq)
-       (filter #(re-matches #".+\.(kt|java)" (.getName %)))
-       (remove #(re-matches #".+(Di|Component|Module).(kt|java)" (.getName %)))
-       (mapv #(let [content (slurp %)
-                    scope (second (re-find #"@(\w+Scope)" content))]
-                {:scope scope
-                 :filename (second (re-find #"(.+)\.[ktjava]+" (.getName %)))}))
-       (filter #(:scope %))
-       (vec)))
-
-(defn format-to-string [root-name modules]
+(defn format-to-string [root-name scope-files modules]
   (defn get-children-modules [name all-modules]
     (->> all-modules
          (filter #(= name (:name %)))
@@ -39,25 +28,31 @@
        (re-seq r)
        (mapv #(str (get % 1) "Scope"))))
 
-(->>
- (concat
+(defn find-scopes [path-to-proj file-reg child-regs]
   (->> (java.io.File. path-to-proj)
        (file-seq)
-       (filter #(re-matches #".+Di\.kt" (.getName %)))
+       (filter #(re-matches file-reg (.getName %)))
        (mapv (fn [x]
                (let [content (slurp x)]
-                 {:name (get (re-find #"@\w*?\.?(\w+Scope)" content) 1)
-                  :children-names (vec (concat
-                                        (load-children content #"get(.+?)Component")
-                                        (load-children content #"Component: (\w+)Component")))}))))
+                 {:name (second (re-find #"@\w*?\.?(\w+Scope)" content))
+                  :children-names (mapcat #(load-children content %) child-regs)})))))
+
+(defn get-scope-files [path-to-proj]
   (->> (java.io.File. path-to-proj)
        (file-seq)
-       (filter #(re-matches #".+Component\.java" (.getName %)))
-       (mapv (fn [x]
-               (let [content (slurp x)]
-                 {:name (get (re-find #"@\w*?\.?(\w+Scope)" content) 1)
-                  :children-names (vec (concat
-                                        (load-children content #"(\w+)Component \w+Component\(")
-                                        (load-children content #"(\w+)Component.Builder get\w+Builder()")))})))))
- (format-to-string "AppScope")
- (println))
+       (filter #(re-matches #".+\.(kt|java)" (.getName %)))
+       (remove #(re-matches #".+(Di|Component|Module).(kt|java)" (.getName %)))
+       (mapv #(let [content (slurp %)]
+                {:scope (second (re-find #"@(\w+Scope)" content))
+                 :filename (second (re-find #"(.+)\.[ktjava]+" (.getName %)))}))
+       (filter #(:scope %))
+       (vec)))
+
+(defn -main [& args]
+  (let [path-to-proj (first args)]
+    (->>
+     (concat
+      (find-scopes path-to-proj #".+Di\.kt" [#"get(.+?)Component" #"Component: (\w+)Component"])
+      (find-scopes path-to-proj #".+Component\.java" [#"(\w+)Component \w+Component\(" #"(\w+)Component.Builder get\w+Builder()"]))
+     (format-to-string "AppScope" (get-scope-files path-to-proj))
+     (println))))
