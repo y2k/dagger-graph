@@ -1,5 +1,6 @@
-(defproject module-graph "0.1.0-SNAPSHOT"
-  :dependencies [[org.clojure/clojure "1.10.0"]]
+(defproject module-graph "0.1"
+  :dependencies [[org.clojure/clojure "1.10.0"]
+                 [org.jsoup/jsoup "1.11.3"]]
   :plugins [[lein-cljfmt "0.6.3"]]
   :main module-graph.core
   :aot [module-graph.core]

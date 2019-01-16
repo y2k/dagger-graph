@@ -6,7 +6,8 @@
     (->> all-modules
          (filter #(= name (:name %)))
          (first)
-         (:children-names)))
+         (:children-names)
+         (sort)))
 
   (defn rec-format-to-string [module-name prefix a b]
     (str prefix a module-name
